@@ -1,0 +1,10 @@
+{
+  "body": "Security review of the proposed changes.",
+  "event": "COMMENT",
+  "comments": [
+    {"path": "main.py", "line": 11, "body": "Critical: Hardcoded API token detected. This should be moved to a secrets manager."},
+    {"path": "main.py", "line": 25, "body": "Medium: Using MD5 for password hashing is insecure. Please use Argon2 or bcrypt."},
+    {"path": "main.py", "line": 41, "body": "High: Potential command injection vulnerability here. Input should be sanitized."},
+    {"path": "requirements.txt", "line": 2, "body": "SCA: Version 2.20.0 of requests has known vulnerabilities."}
+  ]
+}

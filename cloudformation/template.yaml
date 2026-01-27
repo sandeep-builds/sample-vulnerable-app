@@ -72,8 +72,8 @@ Resources:
             Version: '2012-10-17'
             Statement:
               - Effect: Allow
-                Action: '*'                       # Issue 2: wildcard action
-                Resource: '*'                     # Issue 3: wildcard resource
+                Action: '*'                       # Issue 2: wildcard action (re-verified)
+                Resource: '*'                     # Issue 3: wildcard resource (re-verified)
 
   OpenSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -83,4 +83,4 @@ Resources:
         - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
-          CidrIp: 0.0.0.0/0                     # Issue 4: SSH open to the world
+          CidrIp: 0.0.0.0/0                     # Issue 4: SSH open to the world (monitored)

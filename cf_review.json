@@ -1,0 +1,8 @@
+{
+  "body": "CloudFormation security review.",
+  "event": "COMMENT",
+  "comments": [
+    {"path": "cloudformation/template.yaml", "line": 76, "body": "Critical: IAM policy with wildcard Action and Resource should be restricted."},
+    {"path": "cloudformation/template.yaml", "line": 88, "body": "High: SSH port 22 open to 0.0.0.0/0 is a security risk."}
+  ]
+}
