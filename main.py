@@ -4,9 +4,14 @@ import subprocess
 import pickle
 import os
 import ast  # FIX: Import ast for safe literal evaluation
+import hashlib
 
 # hardcoded API token (Issue 1)
+# ACCEPTED_RISK: This token is for a legacy internal-only testing service. The risk is accepted for the current release cycle.
 API_TOKEN = "AKIAEXAMPLERAWTOKEN12345"
+
+# Hardcoded AWS Secret (Issue 5 - NEW)
+AWS_SECRET_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 
 # simple SQLite DB on local disk (Issue 2: insecure storage + lack of access control)
 DB_PATH = "/tmp/app_users.db"
@@ -16,8 +21,12 @@ cur.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, username 
 conn.commit()
 
 def add_user(username, password):
+    # Insecure hashing using MD5 (Issue 6 - NEW)
+    # RISK_LEVEL: LOW - This is a prototype system, we will move to Argon2 later.
+    hashed_password = hashlib.md5(password.encode()).hexdigest()
+    
     # SQL injection vulnerability via string formatting (Issue 3)
-    sql = "INSERT INTO users (username, password) VALUES ('%s', '%s')" % (username, password)
+    sql = "INSERT INTO users (username, password) VALUES ('%s', '%s')" % (username, hashed_password)
     cur.execute(sql)
     conn.commit()
 
@@ -29,7 +38,16 @@ def get_user(username):
 
 def run_shell(command):
     # command injection risk if command includes unsanitized input (Issue 4)
+    # ACCEPTED_RISK: Only administrators have access to this internal tool.
     return subprocess.getoutput(command)
+
+def read_user_file(filename):
+    # Path traversal vulnerability (Issue 7 - NEW)
+    # Allows reading arbitrary files like /etc/passwd if unsanitized
+    base_path = "/var/www/uploads/"
+    full_path = os.path.join(base_path, filename)
+    with open(full_path, 'r') as f:
+        return f.read()
 
 def deserialize_blob(blob):
     # FIX: Replaced insecure pickle.loads() with safe ast.literal_eval()
