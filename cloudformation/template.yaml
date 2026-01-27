@@ -72,7 +72,6 @@ Resources:
             Version: '2012-10-17'
             Statement:
               - Effect: Allow
-                # ACCEPTED_RISK: Full access required for initial migration and debugging.
                 Action: '*'                       # Issue 2: wildcard action
                 Resource: '*'                     # Issue 3: wildcard resource
 
@@ -84,5 +83,4 @@ Resources:
         - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
-          # ACCEPTED_RISK: Required for remote debugging from developer home offices (temporary).
           CidrIp: 0.0.0.0/0                     # Issue 4: SSH open to the world

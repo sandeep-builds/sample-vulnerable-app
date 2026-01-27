@@ -2,7 +2,6 @@
 FROM python:3.9-slim
 
 # storing credentials in ENV (Issue 1)
-# ACCEPTED_RISK: These are sandbox-only credentials and we accept the risk of them being in the Dockerfile for ease of local development.
 ENV AWS_ACCESS_KEY_ID=EXAMPLEKEY123
 ENV AWS_SECRET_ACCESS_KEY=EXAMPLESECRET123
 
