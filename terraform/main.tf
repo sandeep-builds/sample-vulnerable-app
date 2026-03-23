@@ -21,8 +21,8 @@ resource "aws_iam_policy" "app_policy" {
   name        = "app-full-access"
   description = "Policy used by instances"
 
-  # FIX: Replaced wildcard "*" action with specific, least-privilege permissions
-  # This addresses CWE-285 by restricting IAM policy to only necessary actions
+  # FIX: Replaced wildcard "*:*" permissions with least-privilege access
+  # Restricting actions to specific services and resources to prevent full administrative privileges (CWE-285)
   policy = <<EOF
 {
   "Version": "2012-10-17",
@@ -34,7 +34,10 @@ resource "aws_iam_policy" "app_policy" {
         "s3:PutObject",
         "s3:ListBucket"
       ],
-      "Resource": "*"                            # Issue 3: wildcard resources
+      "Resource": [
+        "arn:aws:s3:::sample-app-terraform-bucket-12345",
+        "arn:aws:s3:::sample-app-terraform-bucket-12345/*"
+      ]
     }
   ]
 }
