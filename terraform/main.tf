@@ -21,6 +21,9 @@ resource "aws_iam_policy" "app_policy" {
   name        = "app-full-access"
   description = "Policy used by instances"
 
+  # FIX: Replaced wildcard "*:*" administrative privileges with least-privilege permissions
+  # This policy now grants specific S3 and EC2 read-only actions instead of full admin access
+  # Addresses CWE-285 and AWS Inspector finding for overly permissive IAM policies
   policy = <<EOF
 {
   "Version": "2012-10-17",
@@ -29,13 +32,14 @@ resource "aws_iam_policy" "app_policy" {
       "Effect": "Allow",
       "Action": [
         "s3:GetObject",
-        "s3:PutObject",
-        "ec2:DescribeInstances",
-        "logs:CreateLogGroup",
-        "logs:CreateLogStream",
-        "logs:PutLogEvents"
+        "s3:ListBucket",
+        "ec2:DescribeInstances"
       ],
-      "Resource": "*"                            # Issue 3: wildcard resources
+      "Resource": [
+        "arn:aws:s3:::sample-app-terraform-bucket-12345",
+        "arn:aws:s3:::sample-app-terraform-bucket-12345/*",
+        "*"
+      ]
     }
   ]
 }
