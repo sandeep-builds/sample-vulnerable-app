@@ -14,7 +14,7 @@ provider "aws" {
 
 resource "aws_s3_bucket" "app_bucket" {
   bucket = "sample-app-terraform-bucket-12345"
-  acl    = "public-read"                        # Issue 1: public-read ACL
+  acl    = "private"
 }
 
 resource "aws_iam_policy" "app_policy" {
@@ -27,8 +27,19 @@ resource "aws_iam_policy" "app_policy" {
   "Statement": [
     {
       "Effect": "Allow",
-      "Action": "*",                             # Issue 2: wildcard actions
-      "Resource": "*"                            # Issue 3: wildcard resources
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:ListBucket",
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": [
+        "arn:aws:s3:::sample-app-terraform-bucket-12345",
+        "arn:aws:s3:::sample-app-terraform-bucket-12345/*",
+        "arn:aws:logs:*:*:*"
+      ]
     }
   ]
 }
@@ -37,12 +48,12 @@ EOF
 
 resource "aws_security_group" "open_sg" {
   name        = "open-sg"
-  description = "Security group with wide open access"
+  description = "Security group with restricted access"
 
   ingress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]                 # Issue 4: all ports open to the world
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["10.0.0.0/8"]
   }
 }
