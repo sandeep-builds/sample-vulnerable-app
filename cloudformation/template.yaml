@@ -7,14 +7,23 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: sample-app-bucket-12345
-      AccessControl: PublicRead                 # Issue 1: public read ACL
-      # Added cross-region replication configuration for improved data durability and availability
+      AccessControl: Private
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      ObjectLockEnabled: true
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: alias/aws/s3
       ReplicationConfiguration:
         Role: !GetAtt ReplicationRole.Arn
         Rules:
           - Destination:
               Bucket: !Sub 'arn:aws:s3:::${AWS::StackName}-replica'
-              Region: us-west-2  # Replication to a different region
             Status: Enabled
             Priority: 1
             DeleteMarkerReplication:
@@ -40,13 +49,13 @@ Resources:
                 Action:
                   - s3:GetReplicationConfiguration
                   - s3:ListBucket
-                Resource: !GetAtt AppBucket.Arn
+                Resource: !Sub 'arn:aws:s3:::sample-app-bucket-12345'
               - Effect: Allow
                 Action:
                   - s3:GetObjectVersionForReplication
                   - s3:GetObjectVersionAcl
                   - s3:GetObjectVersionTagging
-                Resource: !Sub '${AppBucket.Arn}/*'
+                Resource: !Sub 'arn:aws:s3:::sample-app-bucket-12345/*'
               - Effect: Allow
                 Action:
                   - s3:ReplicateObject
@@ -71,15 +80,24 @@ Resources:
             Version: '2012-10-17'
             Statement:
               - Effect: Allow
-                Action: '*'                       # Issue 2: wildcard action
-                Resource: '*'                     # Issue 3: wildcard resource
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub 'arn:aws:s3:::sample-app-bucket-12345'
+                  - !Sub 'arn:aws:s3:::sample-app-bucket-12345/*'
+                  - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*'
 
   OpenSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: open-security-group
+      GroupDescription: restricted-security-group
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
-          CidrIp: 0.0.0.0/0                     # Issue 4: SSH open to the world
+          CidrIp: 10.0.0.0/8
