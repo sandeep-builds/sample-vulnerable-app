@@ -1,4 +1,4 @@
-# NOTE: contains intentional security test patterns for SAST/SCA/IaC scanning.
+# Security-hardened CloudFormation template
 AWSTemplateFormatVersion: '2010-09-09'
 Description: Sample CloudFormation template for an application
 
@@ -7,18 +7,35 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: sample-app-bucket-12345
-      AccessControl: PublicRead                 # Issue 1: public read ACL
-      # Added cross-region replication configuration for improved data durability and availability
+      # Fixed CWE-284: Changed from PublicRead to Private ACL
+      AccessControl: Private
+      # Fixed: Added OwnershipControls with BucketOwnerEnforced
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      # Fixed: Added ObjectLockEnabled for data integrity
+      ObjectLockEnabled: true
+      # Fixed: Added VersioningConfiguration for recovery
+      VersioningConfiguration:
+        Status: Enabled
+      # Fixed: Added KMS encryption at rest
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+      # Fixed circular dependency: Use explicit ARN instead of !GetAtt AppBucket.Arn
       ReplicationConfiguration:
         Role: !GetAtt ReplicationRole.Arn
         Rules:
           - Destination:
               Bucket: !Sub 'arn:aws:s3:::${AWS::StackName}-replica'
-              Region: us-west-2  # Replication to a different region
+              StorageClass: STANDARD
             Status: Enabled
             Priority: 1
             DeleteMarkerReplication:
               Status: Enabled
+            Filter:
+              Prefix: ''
 
   # IAM role for S3 replication
   ReplicationRole:
@@ -40,13 +57,14 @@ Resources:
                 Action:
                   - s3:GetReplicationConfiguration
                   - s3:ListBucket
-                Resource: !GetAtt AppBucket.Arn
+                # Fixed circular dependency: Use explicit ARN instead of !GetAtt
+                Resource: !Sub 'arn:aws:s3:::sample-app-bucket-12345'
               - Effect: Allow
                 Action:
                   - s3:GetObjectVersionForReplication
                   - s3:GetObjectVersionAcl
                   - s3:GetObjectVersionTagging
-                Resource: !Sub '${AppBucket.Arn}/*'
+                Resource: !Sub 'arn:aws:s3:::sample-app-bucket-12345/*'
               - Effect: Allow
                 Action:
                   - s3:ReplicateObject
@@ -66,20 +84,33 @@ Resources:
               Service: [ec2.amazonaws.com]
             Action: sts:AssumeRole
       Policies:
-        - PolicyName: AppFullPolicy
+        - PolicyName: AppPolicy
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
+              # Fixed CWE-285: Replaced wildcard with least-privilege permissions
               - Effect: Allow
-                Action: '*'                       # Issue 2: wildcard action
-                Resource: '*'                     # Issue 3: wildcard resource
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub 'arn:aws:s3:::sample-app-bucket-12345'
+                  - !Sub 'arn:aws:s3:::sample-app-bucket-12345/*'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/app/*'
 
   OpenSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: open-security-group
+      GroupDescription: application-security-group
       SecurityGroupIngress:
+        # Fixed CWE-284: Restricted SSH from 0.0.0.0/0 to internal CIDR only
         - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
-          CidrIp: 0.0.0.0/0                     # Issue 4: SSH open to the world
+          CidrIp: 10.0.0.0/8
