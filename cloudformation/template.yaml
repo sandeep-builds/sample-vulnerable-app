@@ -1,4 +1,5 @@
 # NOTE: contains intentional security test patterns for SAST/SCA/IaC scanning.
+# Security fixes applied: private ACL, encryption, versioning, restricted SSH
 AWSTemplateFormatVersion: '2010-09-09'
 Description: Sample CloudFormation template for an application
 
@@ -7,14 +8,28 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: sample-app-bucket-12345
-      AccessControl: PublicRead                 # Issue 1: public read ACL
-      # Added cross-region replication configuration for improved data durability and availability
+      # CWE-284 fix: Changed from PublicRead to Private
+      AccessControl: Private
+      # Added bucket ownership controls to enforce private access
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      # Added server-side encryption
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+      # Added versioning for data protection
+      VersioningConfiguration:
+        Status: Enabled
+      # Added ObjectLock for compliance
+      ObjectLockEnabled: true
+      # Cross-region replication configuration
       ReplicationConfiguration:
         Role: !GetAtt ReplicationRole.Arn
         Rules:
           - Destination:
               Bucket: !Sub 'arn:aws:s3:::${AWS::StackName}-replica'
-              Region: us-west-2  # Replication to a different region
             Status: Enabled
             Priority: 1
             DeleteMarkerReplication:
@@ -40,13 +55,14 @@ Resources:
                 Action:
                   - s3:GetReplicationConfiguration
                   - s3:ListBucket
-                Resource: !GetAtt AppBucket.Arn
+                # Circular dependency fix: Use explicit ARN instead of !GetAtt
+                Resource: !Sub 'arn:aws:s3:::sample-app-bucket-12345'
               - Effect: Allow
                 Action:
                   - s3:GetObjectVersionForReplication
                   - s3:GetObjectVersionAcl
                   - s3:GetObjectVersionTagging
-                Resource: !Sub '${AppBucket.Arn}/*'
+                Resource: !Sub 'arn:aws:s3:::sample-app-bucket-12345/*'
               - Effect: Allow
                 Action:
                   - s3:ReplicateObject
@@ -66,20 +82,33 @@ Resources:
               Service: [ec2.amazonaws.com]
             Action: sts:AssumeRole
       Policies:
-        - PolicyName: AppFullPolicy
+        - PolicyName: AppPolicy
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
+              # CWE-285 fix: Least-privilege - only S3 and CloudWatch Logs access
               - Effect: Allow
-                Action: '*'                       # Issue 2: wildcard action
-                Resource: '*'                     # Issue 3: wildcard resource
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub 'arn:aws:s3:::sample-app-bucket-12345'
+                  - !Sub 'arn:aws:s3:::sample-app-bucket-12345/*'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/app/*'
 
   OpenSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: open-security-group
+      GroupDescription: application-security-group
       SecurityGroupIngress:
+        # CWE-284 fix: Restrict SSH to internal network only
         - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
-          CidrIp: 0.0.0.0/0                     # Issue 4: SSH open to the world
+          CidrIp: 10.0.0.0/8
