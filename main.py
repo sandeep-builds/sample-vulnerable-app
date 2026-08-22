@@ -3,6 +3,9 @@ import sqlite3
 import subprocess
 import pickle
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 # hardcoded API token (Issue 1)
 API_TOKEN = "AKIAEXAMPLERAWTOKEN12345"
@@ -15,15 +18,15 @@ cur.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, username 
 conn.commit()
 
 def add_user(username, password):
-    # SQL injection vulnerability via string formatting (Issue 3)
-    sql = "INSERT INTO users (username, password) VALUES ('%s', '%s')" % (username, password)
-    cur.execute(sql)
+    # Fixed: parameterized query prevents SQL injection (CWE-89)
+    sql = "INSERT INTO users (username, password) VALUES (?, ?)"
+    cur.execute(sql, (username, password))
     conn.commit()
 
 def get_user(username):
-    # SQL injection vulnerability again (Issue 3)
-    q = "SELECT id, username FROM users WHERE username = '%s'" % username
-    cur.execute(q)
+    # Fixed: parameterized query prevents SQL injection (CWE-89)
+    q = "SELECT id, username FROM users WHERE username = ?"
+    cur.execute(q, (username,))
     return cur.fetchall()
 
 def run_shell(command):
@@ -39,8 +42,8 @@ if __name__ == "__main__":
     add_user("alice", "alicepass")
     add_user("bob", "bobpass")
 
-    # Demonstrate risky calls
-    print("API_TOKEN in use:", API_TOKEN)
+    # Fixed: mask sensitive information instead of printing raw token (CWE-200)
+    logger.info("API_TOKEN configured: %s", bool(API_TOKEN))
     print(get_user("alice' OR '1'='1"))  # demonstrates SQLi payload
     print(run_shell("echo Hello && whoami"))
     try:
