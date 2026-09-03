@@ -14,21 +14,30 @@ provider "aws" {
 
 resource "aws_s3_bucket" "app_bucket" {
   bucket = "sample-app-terraform-bucket-12345"
-  acl    = "public-read"                        # Issue 1: public-read ACL
+  # FIX CWE-284: Changed from public-read to private
+  acl    = "private"
 }
 
 resource "aws_iam_policy" "app_policy" {
   name        = "app-full-access"
   description = "Policy used by instances"
 
+  # FIX CWE-285: Replace wildcard IAM policy with least-privilege permissions
   policy = <<EOF
 {
   "Version": "2012-10-17",
   "Statement": [
     {
       "Effect": "Allow",
-      "Action": "*",                             # Issue 2: wildcard actions
-      "Resource": "*"                            # Issue 3: wildcard resources
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::sample-app-terraform-bucket-12345",
+        "arn:aws:s3:::sample-app-terraform-bucket-12345/*"
+      ]
     }
   ]
 }
@@ -37,12 +46,13 @@ EOF
 
 resource "aws_security_group" "open_sg" {
   name        = "open-sg"
-  description = "Security group with wide open access"
+  description = "Security group with restricted access"
 
+  # FIX: Restrict ingress to specific ports and internal CIDR
   ingress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]                 # Issue 4: all ports open to the world
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["10.0.0.0/8"]
   }
 }

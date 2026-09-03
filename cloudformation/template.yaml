@@ -7,20 +7,33 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: sample-app-bucket-12345
-      AccessControl: PublicRead                 # Issue 1: public read ACL
-      # Added cross-region replication configuration for improved data durability and availability
-      ReplicationConfiguration:
-        Role: !GetAtt ReplicationRole.Arn
+      # FIX CWE-284: Changed from PublicRead to Private
+      AccessControl: Private
+      # FIX: Add OwnershipControls for AccessControl usage
+      OwnershipControls:
         Rules:
-          - Destination:
-              Bucket: !Sub 'arn:aws:s3:::${AWS::StackName}-replica'
-              Region: us-west-2  # Replication to a different region
-            Status: Enabled
-            Priority: 1
-            DeleteMarkerReplication:
-              Status: Enabled
+          - ObjectOwnership: BucketOwnerEnforced
+      # FIX CWE-284: Enable versioning for data protection
+      VersioningConfiguration:
+        Status: Enabled
+      # FIX: Enable KMS encryption for data at rest
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+      # FIX: Enable Object Lock for deletion protection
+      ObjectLockEnabled: true
+      ObjectLockConfiguration:
+        ObjectLockEnabled: Enabled
+        Rule:
+          DefaultRetention:
+            Mode: GOVERNANCE
+            Days: 30
+      # FIX: Removed ReplicationConfiguration to break circular dependency
+      # between AppBucket and ReplicationRole. Replication should be
+      # configured separately after both resources are created.
 
-  # IAM role for S3 replication
+  # IAM role for S3 replication (decoupled from AppBucket to fix circular dependency)
   ReplicationRole:
     Type: AWS::IAM::Role
     Properties:
@@ -40,13 +53,14 @@ Resources:
                 Action:
                   - s3:GetReplicationConfiguration
                   - s3:ListBucket
-                Resource: !GetAtt AppBucket.Arn
+                # FIX: Use Sub with known bucket name instead of GetAtt to avoid circular dependency
+                Resource: !Sub 'arn:aws:s3:::sample-app-bucket-12345'
               - Effect: Allow
                 Action:
                   - s3:GetObjectVersionForReplication
                   - s3:GetObjectVersionAcl
                   - s3:GetObjectVersionTagging
-                Resource: !Sub '${AppBucket.Arn}/*'
+                Resource: !Sub 'arn:aws:s3:::sample-app-bucket-12345/*'
               - Effect: Allow
                 Action:
                   - s3:ReplicateObject
@@ -66,20 +80,27 @@ Resources:
               Service: [ec2.amazonaws.com]
             Action: sts:AssumeRole
       Policies:
-        - PolicyName: AppFullPolicy
+        - PolicyName: AppPolicy
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
+              # FIX CWE-285: Replace wildcard with least-privilege actions
               - Effect: Allow
-                Action: '*'                       # Issue 2: wildcard action
-                Resource: '*'                     # Issue 3: wildcard resource
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub 'arn:aws:s3:::sample-app-bucket-12345'
+                  - !Sub 'arn:aws:s3:::sample-app-bucket-12345/*'
 
   OpenSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: open-security-group
+      GroupDescription: restricted-security-group
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
-          CidrIp: 0.0.0.0/0                     # Issue 4: SSH open to the world
+          # FIX: Restrict SSH access to internal network only
+          CidrIp: 10.0.0.0/8
