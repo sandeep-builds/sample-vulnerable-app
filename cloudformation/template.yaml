@@ -14,7 +14,6 @@ Resources:
         Rules:
           - Destination:
               Bucket: !Sub 'arn:aws:s3:::${AWS::StackName}-replica'
-              Region: us-west-2  # Replication to a different region
             Status: Enabled
             Priority: 1
             DeleteMarkerReplication:
