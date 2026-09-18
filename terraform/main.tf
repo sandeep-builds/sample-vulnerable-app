@@ -18,21 +18,49 @@ resource "aws_s3_bucket" "app_bucket" {
 }
 
 resource "aws_iam_policy" "app_policy" {
-  name        = "app-full-access"
-  description = "Policy used by instances"
+  name        = "app-least-privilege"
+  description = "Least-privilege policy for application instances"
 
-  policy = <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": "*",                             # Issue 2: wildcard actions
-      "Resource": "*"                            # Issue 3: wildcard resources
-    }
-  ]
-}
-EOF
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "S3AppBucketAccess"
+        Effect   = "Allow"
+        Action   = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:ListBucket",
+          "s3:DeleteObject"
+        ]
+        Resource = [
+          aws_s3_bucket.app_bucket.arn,
+          "${aws_s3_bucket.app_bucket.arn}/*"
+        ]
+      },
+      {
+        Sid      = "CloudWatchLogs"
+        Effect   = "Allow"
+        Action   = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+          "logs:DescribeLogStreams"
+        ]
+        Resource = "arn:aws:logs:*:*:log-group:/app/*"
+      },
+      {
+        Sid      = "SSMParameterRead"
+        Effect   = "Allow"
+        Action   = [
+          "ssm:GetParameter",
+          "ssm:GetParameters",
+          "ssm:GetParametersByPath"
+        ]
+        Resource = "arn:aws:ssm:*:*:parameter/app/*"
+      }
+    ]
+  })
 }
 
 resource "aws_security_group" "open_sg" {
