@@ -7,14 +7,28 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: sample-app-bucket-12345
-      AccessControl: PublicRead                 # Issue 1: public read ACL
+      # CWE-284 Fix: Removed PublicRead ACL. Added BucketOwnerEnforced ownership controls.
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+      VersioningConfiguration:
+        Status: Enabled
+      ObjectLockEnabled: true
       # Added cross-region replication configuration for improved data durability and availability
       ReplicationConfiguration:
         Role: !GetAtt ReplicationRole.Arn
         Rules:
           - Destination:
               Bucket: !Sub 'arn:aws:s3:::${AWS::StackName}-replica'
-              Region: us-west-2  # Replication to a different region
             Status: Enabled
             Priority: 1
             DeleteMarkerReplication:
