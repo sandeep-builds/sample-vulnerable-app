@@ -7,6 +7,9 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: sample-app-bucket-12345
+      ObjectLockEnabled: true
+      VersioningConfiguration:
+        Status: Enabled
       AccessControl: PublicRead                 # Issue 1: public read ACL
       # Added cross-region replication configuration for improved data durability and availability
       ReplicationConfiguration:
