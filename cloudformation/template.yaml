@@ -8,6 +8,9 @@ Resources:
     Properties:
       BucketName: sample-app-bucket-12345
       AccessControl: PublicRead                 # Issue 1: public read ACL
+      ObjectLockEnabled: true
+      VersioningConfiguration:
+        Status: Enabled
       # Added cross-region replication configuration for improved data durability and availability
       ReplicationConfiguration:
         Role: !GetAtt ReplicationRole.Arn
