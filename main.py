@@ -40,7 +40,7 @@ if __name__ == "__main__":
     add_user("bob", "bobpass")
 
     # Demonstrate risky calls
-    print("API_TOKEN in use:", API_TOKEN)
+    print("API_TOKEN in use:", API_TOKEN[:4] + "****" + API_TOKEN[-4:] if len(API_TOKEN) > 8 else "****")
     print(get_user("alice' OR '1'='1"))  # demonstrates SQLi payload
     print(run_shell("echo Hello && whoami"))
     try:
