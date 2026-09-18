@@ -1,5 +1,5 @@
 # NOTE: intentionally includes older dependencies for dependency-scanning tests.
-Flask==1.0.2       # older Flask release
+Flask==2.3.2       # upgraded from 1.0.2 to fix CVE-2023-30861 (session data exposure via caching proxy)
 requests==2.18.4   # older requests with known issues
 PyYAML==3.13       # older PyYAML (unsafe load risks in some usage)
 boto3==1.7.0       # older boto3 version
