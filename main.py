@@ -3,9 +3,12 @@ import sqlite3
 import subprocess
 import pickle
 import os
+import logging
 
-# hardcoded API token (Issue 1)
-API_TOKEN = "AKIAEXAMPLERAWTOKEN12345"
+logger = logging.getLogger(__name__)
+
+# CWE-200 Fix: Read API token from environment variable instead of hardcoding
+API_TOKEN = os.environ.get("API_TOKEN", "")
 
 # simple SQLite DB on local disk (Issue 2: insecure storage + lack of access control)
 DB_PATH = "/tmp/app_users.db"
@@ -15,15 +18,15 @@ cur.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, username 
 conn.commit()
 
 def add_user(username, password):
-    # SQL injection vulnerability via string formatting (Issue 3)
-    sql = "INSERT INTO users (username, password) VALUES ('%s', '%s')" % (username, password)
-    cur.execute(sql)
+    # CWE-89 Fix: Use parameterized queries instead of string formatting
+    sql = "INSERT INTO users (username, password) VALUES (?, ?)"
+    cur.execute(sql, (username, password))
     conn.commit()
 
 def get_user(username):
-    # SQL injection vulnerability again (Issue 3)
-    q = "SELECT id, username FROM users WHERE username = '%s'" % username
-    cur.execute(q)
+    # CWE-89 Fix: Use parameterized queries instead of string formatting
+    q = "SELECT id, username FROM users WHERE username = ?"
+    cur.execute(q, (username,))
     return cur.fetchall()
 
 def run_shell(command):
@@ -39,8 +42,8 @@ if __name__ == "__main__":
     add_user("alice", "alicepass")
     add_user("bob", "bobpass")
 
-    # Demonstrate risky calls
-    print("API_TOKEN in use:", API_TOKEN)
+    # CWE-200 Fix: Use logger instead of print to avoid leaking sensitive values
+    logger.info("API_TOKEN is configured: %s", bool(API_TOKEN))
     print(get_user("alice' OR '1'='1"))  # demonstrates SQLi payload
     print(run_shell("echo Hello && whoami"))
     try:

@@ -14,9 +14,10 @@ provider "aws" {
 
 resource "aws_s3_bucket" "app_bucket" {
   bucket = "sample-app-terraform-bucket-12345"
-  acl    = "public-read"                        # Issue 1: public-read ACL
+  acl    = "private"                              # Fix: changed from public-read to private
 }
 
+# CWE-285 Fix: Replaced wildcard IAM policy with least-privilege S3 permissions
 resource "aws_iam_policy" "app_policy" {
   name        = "app-full-access"
   description = "Policy used by instances"
@@ -27,8 +28,15 @@ resource "aws_iam_policy" "app_policy" {
   "Statement": [
     {
       "Effect": "Allow",
-      "Action": "*",                             # Issue 2: wildcard actions
-      "Resource": "*"                            # Issue 3: wildcard resources
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::sample-app-terraform-bucket-12345",
+        "arn:aws:s3:::sample-app-terraform-bucket-12345/*"
+      ]
     }
   ]
 }

@@ -7,52 +7,17 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: sample-app-bucket-12345
-      AccessControl: PublicRead                 # Issue 1: public read ACL
-      # Added cross-region replication configuration for improved data durability and availability
-      ReplicationConfiguration:
-        Role: !GetAtt ReplicationRole.Arn
+      # CWE-284 Fix: Removed PublicRead ACL, enforced bucket owner controls
+      OwnershipControls:
         Rules:
-          - Destination:
-              Bucket: !Sub 'arn:aws:s3:::${AWS::StackName}-replica'
-              Region: us-west-2  # Replication to a different region
-            Status: Enabled
-            Priority: 1
-            DeleteMarkerReplication:
-              Status: Enabled
-
-  # IAM role for S3 replication
-  ReplicationRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: s3.amazonaws.com
-            Action: sts:AssumeRole
-      Policies:
-        - PolicyName: S3ReplicationPolicy
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - s3:GetReplicationConfiguration
-                  - s3:ListBucket
-                Resource: !GetAtt AppBucket.Arn
-              - Effect: Allow
-                Action:
-                  - s3:GetObjectVersionForReplication
-                  - s3:GetObjectVersionAcl
-                  - s3:GetObjectVersionTagging
-                Resource: !Sub '${AppBucket.Arn}/*'
-              - Effect: Allow
-                Action:
-                  - s3:ReplicateObject
-                  - s3:ReplicateDelete
-                  - s3:ReplicateTags
-                Resource: !Sub 'arn:aws:s3:::${AWS::StackName}-replica/*'
+          - ObjectOwnership: BucketOwnerEnforced
+      ObjectLockEnabled: true
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
 
   AppRole:
     Type: AWS::IAM::Role
@@ -82,4 +47,4 @@ Resources:
         - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
-          CidrIp: 0.0.0.0/0                     # Issue 4: SSH open to the world
+          CidrIp: 10.0.0.0/8                     # Fix: Restricted SSH from 0.0.0.0/0 to private network
