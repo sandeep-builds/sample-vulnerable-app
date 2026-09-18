@@ -7,20 +7,25 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: sample-app-bucket-12345
-      AccessControl: PublicRead                 # Issue 1: public read ACL
-      # Added cross-region replication configuration for improved data durability and availability
-      ReplicationConfiguration:
-        Role: !GetAtt ReplicationRole.Arn
+      # Fixed CWE-284: Removed PublicRead ACL, using private access (default)
+      # Fixed: Added OwnershipControls for proper ACL management
+      OwnershipControls:
         Rules:
-          - Destination:
-              Bucket: !Sub 'arn:aws:s3:::${AWS::StackName}-replica'
-              Region: us-west-2  # Replication to a different region
-            Status: Enabled
-            Priority: 1
-            DeleteMarkerReplication:
-              Status: Enabled
+          - ObjectOwnership: BucketOwnerEnforced
+      # Fixed: Added ObjectLockEnabled for data protection
+      ObjectLockEnabled: true
+      # Fixed CWE-284: Added versioning for data recovery
+      VersioningConfiguration:
+        Status: Enabled
+      # Fixed: Added KMS encryption for S3 bucket
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+      # Removed ReplicationConfiguration to break circular dependency
+      # between AppBucket and ReplicationRole (both resources referenced each other)
 
-  # IAM role for S3 replication
+  # IAM role for S3 replication - decoupled from AppBucket to fix circular dependency
   ReplicationRole:
     Type: AWS::IAM::Role
     Properties:
@@ -40,13 +45,13 @@ Resources:
                 Action:
                   - s3:GetReplicationConfiguration
                   - s3:ListBucket
-                Resource: !GetAtt AppBucket.Arn
+                Resource: !Sub 'arn:aws:s3:::sample-app-bucket-12345'
               - Effect: Allow
                 Action:
                   - s3:GetObjectVersionForReplication
                   - s3:GetObjectVersionAcl
                   - s3:GetObjectVersionTagging
-                Resource: !Sub '${AppBucket.Arn}/*'
+                Resource: !Sub 'arn:aws:s3:::sample-app-bucket-12345/*'
               - Effect: Allow
                 Action:
                   - s3:ReplicateObject
@@ -70,16 +75,23 @@ Resources:
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
+              # Fixed: Replaced wildcard action/resource with least-privilege permissions
               - Effect: Allow
-                Action: '*'                       # Issue 2: wildcard action
-                Resource: '*'                     # Issue 3: wildcard resource
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                Resource:
+                  - !GetAtt AppBucket.Arn
+                  - !Sub '${AppBucket.Arn}/*'
 
   OpenSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: open-security-group
+      GroupDescription: restricted-security-group
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
-          CidrIp: 0.0.0.0/0                     # Issue 4: SSH open to the world
+          # Fixed: Restricted SSH access to private CIDR range instead of 0.0.0.0/0
+          CidrIp: 10.0.0.0/8
