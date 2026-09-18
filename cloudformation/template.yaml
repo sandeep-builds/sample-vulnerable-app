@@ -8,6 +8,10 @@ Resources:
     Properties:
       BucketName: sample-app-bucket-12345
       AccessControl: PublicRead                 # Issue 1: public read ACL
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
       # Added cross-region replication configuration for improved data durability and availability
       ReplicationConfiguration:
         Role: !GetAtt ReplicationRole.Arn
